@@ -510,19 +510,6 @@ HTML = """<!DOCTYPE html>
       <span id="disk-usage">Calculating...</span>
       <span class="eta" id="eta"></span>
     </div>
-    <div style="margin-top: 1rem;">
-      <div class="progress-header" style="margin-bottom: 0.5rem;">
-        <span class="progress-title" style="font-size: 0.85rem;">Storage</span>
-        <span id="storage-label" style="font-size: 0.85rem; color: var(--text-dim);"></span>
-      </div>
-      <div class="disk-bar-outer" style="height: 12px;">
-        <div class="disk-bar-inner" id="disk-bar" style="width: 0%; background: linear-gradient(90deg, var(--purple), var(--accent));"></div>
-      </div>
-      <div class="progress-detail" style="margin-top: 0.4rem;">
-        <span id="storage-downloaded" style="font-size: 0.8rem; color: var(--text-dim);"></span>
-        <span id="storage-remaining" style="font-size: 0.8rem; color: var(--text-dim);"></span>
-      </div>
-    </div>
   </div>
 
   <!-- Completed Videos -->
@@ -620,21 +607,10 @@ HTML = """<!DOCTYPE html>
       // Storage info
       if (data.disk_usage_mb) {
         const dlGb = (data.disk_usage_mb / 1024).toFixed(1);
-        const estTotalGb = (data.estimated_total_mb / 1024).toFixed(1);
         const estRemainGb = (data.estimated_remaining_mb / 1024).toFixed(1);
-        const avgMb = data.avg_size_mb;
-        const storagePct = data.estimated_total_mb > 0
-          ? ((data.disk_usage_mb / data.estimated_total_mb) * 100) : 0;
 
         document.getElementById('disk-usage').textContent =
-          dlGb + ' GB of ~' + estTotalGb + ' GB (avg ' + avgMb + ' MB/video)';
-        document.getElementById('disk-bar').style.width = storagePct.toFixed(1) + '%';
-        document.getElementById('storage-downloaded').textContent =
-          dlGb + ' GB downloaded';
-        document.getElementById('storage-remaining').textContent =
-          '~' + estRemainGb + ' GB remaining';
-        document.getElementById('storage-label').textContent =
-          dlGb + ' / ~' + estTotalGb + ' GB';
+          dlGb + ' GB downloaded \u2022 ~' + estRemainGb + ' GB remaining';
       }
 
       // Render video lists
