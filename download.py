@@ -150,15 +150,61 @@ def list_videos_via_profile(profile_url, browser):
 def load_manifest(output_dir):
     path = Path(output_dir) / MANIFEST_FILE
     if path.exists():
-        with open(path) as f:
-            return json.load(f)
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            # Manifest corrupted (e.g. killed mid-write), try backup
+            backup = Path(output_dir) / (MANIFEST_FILE + ".bak")
+            if backup.exists():
+                with open(backup) as f:
+                    return json.load(f)
     return {"videos": {}, "downloaded": [], "failed": [], "skipped": []}
 
 
 def save_manifest(output_dir, manifest):
     path = Path(output_dir) / MANIFEST_FILE
-    with open(path, "w") as f:
+    # Atomic write: write to temp file, then rename
+    tmp_path = Path(output_dir) / (MANIFEST_FILE + ".tmp")
+    with open(tmp_path, "w") as f:
         json.dump(manifest, f, indent=2)
+    # Keep a backup of the last good manifest
+    if path.exists():
+        backup = Path(output_dir) / (MANIFEST_FILE + ".bak")
+        path.replace(backup)
+    tmp_path.replace(path)
+
+
+def sync_manifest_with_archive(output_dir):
+    """Sync manifest statuses with yt-dlp's archive and files on disk."""
+    manifest = load_manifest(output_dir)
+
+    archive_ids = set()
+    archive_path = Path(output_dir) / ARCHIVE_FILE
+    if archive_path.exists():
+        with open(archive_path) as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    archive_ids.add(parts[1])
+
+    for f in Path(output_dir).glob("*.mp4"):
+        import re
+        match = re.search(r'\[(\d+)\]', f.name)
+        if match:
+            archive_ids.add(match.group(1))
+
+    fixed = 0
+    for vid_id, info in manifest["videos"].items():
+        if info["status"] != "done" and vid_id in archive_ids:
+            info["status"] = "done"
+            fixed += 1
+
+    if fixed:
+        print(f"  Synced {fixed} videos from archive/disk to manifest")
+
+    save_manifest(output_dir, manifest)
+    return manifest
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +246,8 @@ def download_video(video_url, output_dir, browser):
 
 def run_downloads(videos, output_dir, browser):
     """Download all videos with progress tracking."""
-    manifest = load_manifest(output_dir)
+    # Sync manifest with what's actually on disk first
+    manifest = sync_manifest_with_archive(output_dir)
     total = len(videos)
 
     # Store video list in manifest
