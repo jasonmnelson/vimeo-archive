@@ -683,15 +683,43 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             self.send_error(404)
 
     def get_status(self):
+        import re
+
         try:
             with open(MANIFEST_FILE) as f:
                 manifest = json.load(f)
         except (FileNotFoundError, json.JSONDecodeError):
-            return {"total": 0, "done": 0, "pending": 0, "failed": 0,
-                    "videos_done": [], "videos_failed": [], "videos_pending": [],
-                    "disk_usage_mb": 0, "file_count": 0}
+            # Try backup
+            try:
+                with open(MANIFEST_FILE + ".bak") as f:
+                    manifest = json.load(f)
+            except (FileNotFoundError, json.JSONDecodeError):
+                return {"total": 0, "done": 0, "pending": 0, "failed": 0,
+                        "videos_done": [], "videos_failed": [], "videos_pending": [],
+                        "disk_usage_mb": 0, "file_count": 0}
 
         videos = manifest.get("videos", {})
+
+        # Ground truth: check yt-dlp archive and actual files on disk
+        confirmed_ids = set()
+        archive_path = os.path.join(DOWNLOADS_DIR, "downloaded.txt")
+        if os.path.exists(archive_path):
+            with open(archive_path) as f:
+                for line in f:
+                    parts = line.strip().split()
+                    if len(parts) >= 2:
+                        confirmed_ids.add(parts[1])
+
+        dl_path = Path(DOWNLOADS_DIR)
+        disk_usage = 0
+        file_count = 0
+        if dl_path.exists():
+            for f in dl_path.glob("*.mp4"):
+                disk_usage += f.stat().st_size
+                file_count += 1
+                match = re.search(r'\[(\d+)\]', f.name)
+                if match:
+                    confirmed_ids.add(match.group(1))
 
         done_list = []
         failed_list = []
@@ -699,21 +727,13 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
 
         for vid_id, info in videos.items():
             entry = {"name": info.get("name", "Unknown"), "link": info.get("link", "")}
-            if info["status"] == "done":
+            # Trust disk over manifest
+            if vid_id in confirmed_ids:
                 done_list.append(entry)
             elif info["status"] == "failed":
                 failed_list.append(entry)
             else:
                 pending_list.append(entry)
-
-        # Disk usage
-        disk_usage = 0
-        file_count = 0
-        dl_path = Path(DOWNLOADS_DIR)
-        if dl_path.exists():
-            for f in dl_path.glob("*.mp4"):
-                disk_usage += f.stat().st_size
-                file_count += 1
 
         return {
             "total": len(videos),
