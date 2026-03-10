@@ -245,6 +245,10 @@ def run_downloads(videos, output_dir, browser):
                         actually_downloaded = True
                         break
 
+        # Reload manifest from disk before updating to avoid overwriting
+        # changes made by other processes or manual fixes
+        manifest = load_manifest(output_dir)
+
         if success or actually_downloaded:
             manifest["videos"][vid_id]["status"] = "done"
             print(f"  Done\n")
