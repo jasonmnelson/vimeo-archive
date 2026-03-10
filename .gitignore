@@ -1,4 +1,6 @@
 .env
 cookies.txt
 downloads/
+download.log
 __pycache__/
+.DS_Store

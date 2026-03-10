@@ -111,9 +111,7 @@ It picks up right where it left off.
 vimeo-archive/
   download.py          # Main downloader script
   dashboard.py         # Live progress dashboard
-  test_api.py          # API token tester (optional)
   cookies.txt          # Your browser cookies (not committed)
-  .env                 # API token if you have one (not committed)
   downloads/
     manifest.json      # Progress tracking
     downloaded.txt     # yt-dlp's archive file
