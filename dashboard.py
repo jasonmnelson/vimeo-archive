@@ -507,12 +507,20 @@ HTML = """<!DOCTYPE html>
       <div class="progress-bar-inner" id="progress-bar" style="width: 0%"></div>
     </div>
     <div class="progress-detail">
-      <span id="disk-usage">Calculating disk usage...</span>
+      <span id="disk-usage">Calculating...</span>
       <span class="eta" id="eta"></span>
     </div>
-    <div class="disk-bar" id="disk-section" style="display:none">
-      <div class="disk-bar-outer">
-        <div class="disk-bar-inner" id="disk-bar" style="width: 0%"></div>
+    <div style="margin-top: 1rem;">
+      <div class="progress-header" style="margin-bottom: 0.5rem;">
+        <span class="progress-title" style="font-size: 0.85rem;">Storage</span>
+        <span id="storage-label" style="font-size: 0.85rem; color: var(--text-dim);"></span>
+      </div>
+      <div class="disk-bar-outer" style="height: 12px;">
+        <div class="disk-bar-inner" id="disk-bar" style="width: 0%; background: linear-gradient(90deg, var(--purple), var(--accent));"></div>
+      </div>
+      <div class="progress-detail" style="margin-top: 0.4rem;">
+        <span id="storage-downloaded" style="font-size: 0.8rem; color: var(--text-dim);"></span>
+        <span id="storage-remaining" style="font-size: 0.8rem; color: var(--text-dim);"></span>
       </div>
     </div>
   </div>
@@ -609,11 +617,24 @@ HTML = """<!DOCTYPE html>
       prevDone = data.done;
       prevTime = now;
 
-      // Disk usage
+      // Storage info
       if (data.disk_usage_mb) {
-        const gb = (data.disk_usage_mb / 1024).toFixed(1);
+        const dlGb = (data.disk_usage_mb / 1024).toFixed(1);
+        const estTotalGb = (data.estimated_total_mb / 1024).toFixed(1);
+        const estRemainGb = (data.estimated_remaining_mb / 1024).toFixed(1);
+        const avgMb = data.avg_size_mb;
+        const storagePct = data.estimated_total_mb > 0
+          ? ((data.disk_usage_mb / data.estimated_total_mb) * 100) : 0;
+
         document.getElementById('disk-usage').textContent =
-          gb + ' GB downloaded (' + data.file_count + ' files)';
+          dlGb + ' GB of ~' + estTotalGb + ' GB (avg ' + avgMb + ' MB/video)';
+        document.getElementById('disk-bar').style.width = storagePct.toFixed(1) + '%';
+        document.getElementById('storage-downloaded').textContent =
+          dlGb + ' GB downloaded';
+        document.getElementById('storage-remaining').textContent =
+          '~' + estRemainGb + ' GB remaining';
+        document.getElementById('storage-label').textContent =
+          dlGb + ' / ~' + estTotalGb + ' GB';
       }
 
       // Render video lists
@@ -735,6 +756,13 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             else:
                 pending_list.append(entry)
 
+        # Storage calculations
+        disk_usage_mb = round(disk_usage / (1024 * 1024), 1)
+        avg_size_mb = (disk_usage_mb / file_count) if file_count > 0 else 0
+        # Known total from Vimeo: 576 GB
+        known_total_mb = 576 * 1024
+        estimated_remaining_mb = round(known_total_mb - disk_usage_mb, 1)
+
         return {
             "total": len(videos),
             "done": len(done_list),
@@ -743,8 +771,11 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
             "videos_done": done_list,
             "videos_failed": failed_list,
             "videos_pending": pending_list,
-            "disk_usage_mb": round(disk_usage / (1024 * 1024), 1),
+            "disk_usage_mb": disk_usage_mb,
             "file_count": file_count,
+            "avg_size_mb": round(avg_size_mb, 1),
+            "estimated_total_mb": known_total_mb,
+            "estimated_remaining_mb": estimated_remaining_mb,
         }
 
     def log_message(self, format, *args):
