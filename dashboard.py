@@ -722,14 +722,23 @@ class DashboardHandler(http.server.SimpleHTTPRequestHandler):
         failed_list = []
         pending_list = []
 
+        # IDs confirmed in archive but WITHOUT an mp4 on disk = failed
+        mp4_ids = set()
+        for f in dl_path.glob("*.mp4"):
+            match = re.search(r'\[(\d+)\]', f.name)
+            if match:
+                mp4_ids.add(match.group(1))
+
         for vid_id, info in videos.items():
             entry = {"name": info.get("name", "Unknown"), "link": info.get("link", "")}
-            # Trust disk over manifest
-            if vid_id in confirmed_ids:
+            if vid_id in mp4_ids:
+                # Has an actual file on disk
                 done_list.append(entry)
-            elif info["status"] == "failed":
+            elif vid_id in confirmed_ids:
+                # In yt-dlp archive but no mp4 = attempted but failed
                 failed_list.append(entry)
             else:
+                # Not attempted yet
                 pending_list.append(entry)
 
         # Storage calculations
