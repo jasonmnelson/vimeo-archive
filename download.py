@@ -235,7 +235,17 @@ def run_downloads(videos, output_dir, browser):
 
         success = download_video(url, output_dir, browser)
 
-        if success:
+        # Check yt-dlp's archive as ground truth (exit code is unreliable)
+        actually_downloaded = False
+        archive_path = Path(output_dir) / ARCHIVE_FILE
+        if archive_path.exists():
+            with open(archive_path) as af:
+                for line in af:
+                    if vid_id in line:
+                        actually_downloaded = True
+                        break
+
+        if success or actually_downloaded:
             manifest["videos"][vid_id]["status"] = "done"
             print(f"  Done\n")
         else:
