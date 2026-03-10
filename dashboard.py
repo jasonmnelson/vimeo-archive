@@ -548,7 +548,7 @@ HTML = """<!DOCTYPE html>
 </div>
 
 <script>
-  let prevDone = 0;
+  let prevMb = 0;
   let prevTime = Date.now();
   let rateHistory = [];
 
@@ -575,33 +575,37 @@ HTML = """<!DOCTYPE html>
       document.getElementById('pending').textContent = data.pending;
       document.getElementById('failed').textContent = data.failed;
 
-      const pct = data.total > 0 ? ((data.done / data.total) * 100) : 0;
+      const pct = data.estimated_total_mb > 0
+        ? ((data.disk_usage_mb / data.estimated_total_mb) * 100) : 0;
       document.getElementById('pct').textContent = pct.toFixed(1) + '%';
       document.getElementById('progress-bar').style.width = pct + '%';
 
-      // Calculate ETA based on download rate
+      // Calculate ETA based on MB download rate
       const now = Date.now();
-      if (prevDone > 0 && data.done > prevDone) {
+      if (prevMb > 0 && data.disk_usage_mb > prevMb) {
         const elapsed = (now - prevTime) / 1000 / 60; // minutes
-        const rate = (data.done - prevDone) / elapsed; // videos per minute
-        rateHistory.push(rate);
+        const rateMb = (data.disk_usage_mb - prevMb) / elapsed; // MB per minute
+        rateHistory.push(rateMb);
         if (rateHistory.length > 6) rateHistory.shift();
 
         const avgRate = rateHistory.reduce((a, b) => a + b, 0) / rateHistory.length;
-        const remaining = data.pending + data.failed;
-        const etaMin = remaining / avgRate;
+        const etaMin = data.estimated_remaining_mb / avgRate;
 
         let etaStr;
         if (etaMin < 60) {
           etaStr = Math.round(etaMin) + ' min remaining';
-        } else {
+        } else if (etaMin < 1440) {
           const hrs = Math.floor(etaMin / 60);
           const mins = Math.round(etaMin % 60);
           etaStr = hrs + 'h ' + mins + 'm remaining';
+        } else {
+          const days = Math.floor(etaMin / 1440);
+          const hrs = Math.round((etaMin % 1440) / 60);
+          etaStr = days + 'd ' + hrs + 'h remaining';
         }
         document.getElementById('eta').textContent = etaStr;
       }
-      prevDone = data.done;
+      prevMb = data.disk_usage_mb;
       prevTime = now;
 
       // Storage info
